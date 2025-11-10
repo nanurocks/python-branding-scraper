@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Branding Scraper</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #fafafa; }
+    input, button { padding: 10px; font-size: 16px; }
+    .result { margin-top: 30px; background: #fff; padding: 20px; border-radius: 10px; }
+    .color-swatch { display: inline-block; width: 30px; height: 30px; margin: 3px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Website Branding Scraper</h1>
+  <form id="scrapeForm">
+    <input type="text" id="domain" name="domain" placeholder="Enter domain (e.g. https://www.airbnb.co.in)" size="50" required>
+    <button type="submit">Analyze</button>
+  </form>
+
+  <div id="result" class="result" style="display:none;"></div>
+
+  <script>
+    const form = document.getElementById("scrapeForm");
+    const analyzeBtn = form.querySelector("button[type='submit']");
+    
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const domain = document.getElementById("domain").value;
+      const resDiv = document.getElementById("result");
+      
+      // Disable button and show loading
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = "Analyzing...";
+      resDiv.style.display = "block";
+      resDiv.innerHTML = "<p>⏳ Scraping in progress... Please wait.</p>";
+
+      try {
+        // Call PHP endpoint which will call Python scraper and save to database
+        const formData = new FormData();
+        formData.append('domain', domain);
+        
+        const res = await fetch("http://devmaster8.kblive.com/brand/scrape", {
+          method: "POST",
+          body: formData
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const response = await res.json();
+        console.log(response);
+
+        if (response.error) {
+          resDiv.innerHTML = `<p style="color:red;">❌ ${response.error}</p>`;
+          return;
+        }
+
+        // Check if we have data in the response
+        const data = response.data || response;
+        
+        if (response.success) {
+          resDiv.innerHTML = `
+            <div style="background:#d4edda; padding:10px; border-radius:5px; margin-bottom:15px; color:#155724;">
+              ✅ <strong>Success!</strong> Data has been saved to database (ID: ${response.id})
+            </div>
+            <h2>Results for ${data.url}</h2>
+            <p><strong>Title:</strong> ${data.title || 'N/A'}</p>
+            <p><strong>Meta Description:</strong> ${data.meta_description || 'N/A'}</p>
+            <p><strong>Headings:</strong> ${data.headings && data.headings.length ? data.headings.join(", ") : 'None found'}</p>
+            <p><strong>Content Snippet:</strong> ${data.content_snippet ? data.content_snippet.substring(0, 200) + '...' : 'N/A'}</p>
+            <p><strong>Logo:</strong> ${data.logo ? (data.logo.startsWith('<svg') ? `<div style="max-height:80px; display:inline-block;">${data.logo}</div>` : `<img src="${data.logo}" alt="Logo" style="max-height:80px;">`) : "Not found"}</p>
+            <p><strong>Favicon:</strong> ${data.favicon ? `<img src="${data.favicon}" alt="Favicon" style="max-height:32px;">` : "Not found"}</p>
+            <p><strong>Detected Colors:</strong></p>
+            <div>${data.colors && data.colors.length ? data.colors.map(c => `<div class='color-swatch' style='background:${c}' title='${c}'></div>`).join("") : 'None found'}</div>
+          `;
+        } else {
+          resDiv.innerHTML = `<p style="color:red;">❌ Error: ${response.error || 'Unknown error'}</p>`;
+        }
+      } catch (error) {
+        resDiv.innerHTML = `<p style="color:red;">❌ Error: ${error.message}</p>`;
+      } finally {
+        // Re-enable button
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = "Analyze";
+      }
+    });
+  </script>
+</body>
+</html>
